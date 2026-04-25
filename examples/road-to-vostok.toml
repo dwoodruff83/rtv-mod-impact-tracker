@@ -18,3 +18,11 @@ app_id = 1963610   # Road to Vostok (full game). Use 2141300 for the Demo.
 [snapshot]
 # Top-level entries inside `decompiled` to skip when capturing.
 exclude_toplevel = ["mods", ".godot", "gdre_export.log"]
+
+# Optional. Only needed if you use fetch_version.py to pull historical builds.
+# All paths are workspace-relative.
+# [fetch_version]
+# manifests_file       = "manifests.json"
+# gdre_exe             = "tools/GDRE_tools/gdre_tools.exe"
+# depot_downloader_exe = "tools/DepotDownloader/DepotDownloader.exe"
+# scratch_dir          = "tools/_versions"

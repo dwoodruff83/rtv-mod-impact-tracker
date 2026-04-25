@@ -46,6 +46,7 @@ class ChangedFile:
     path: str
     status: str
     signature_changed: bool = False
+    diff_text: str = ""  # unified diff body, populated when include_diffs is True
 
 
 @dataclass
@@ -145,6 +146,15 @@ def detect_signature_change(from_ref: str, to_ref: str, path: str, history: Path
     return signatures_of(old) != signatures_of(new)
 
 
+def fetch_unified_diff(from_ref: str, to_ref: str, path: str, history: Path) -> str:
+    """Return git's unified diff for one file between two refs."""
+    r = subprocess.run(
+        ["git", "diff", "--no-color", "-U3", f"{from_ref}..{to_ref}", "--", path],
+        cwd=history, text=True, capture_output=True,
+    )
+    return r.stdout
+
+
 def load_mods(mods_dir: Path) -> list[ModImpact]:
     mods = []
     if not mods_dir.exists():
@@ -185,7 +195,9 @@ def load_mods(mods_dir: Path) -> list[ModImpact]:
     return mods
 
 
-def analyze(from_ref: str, to_ref: str, history: Path, mods_dir: Path) -> list[ModImpact]:
+def analyze(
+    from_ref: str, to_ref: str, history: Path, mods_dir: Path, include_diffs: bool = True
+) -> list[ModImpact]:
     mods = load_mods(mods_dir)
     changed = changed_paths_between(from_ref, to_ref, history)
     for impact in mods:
@@ -193,7 +205,10 @@ def analyze(from_ref: str, to_ref: str, history: Path, mods_dir: Path) -> list[M
             if override in changed:
                 status = changed[override]
                 sig = False if status == "D" else detect_signature_change(from_ref, to_ref, override, history)
-                impact.touched.append(ChangedFile(path=override, status=status, signature_changed=sig))
+                cf = ChangedFile(path=override, status=status, signature_changed=sig)
+                if include_diffs:
+                    cf.diff_text = fetch_unified_diff(from_ref, to_ref, override, history)
+                impact.touched.append(cf)
     return mods
 
 
@@ -223,6 +238,27 @@ def render_html(mods: list[ModImpact], from_ref: str, to_ref: str) -> str:
     def esc(s: str) -> str:
         return html.escape(s)
 
+    def render_diff(diff: str) -> str:
+        lines = diff.splitlines()
+        body_start = 0
+        for i, ln in enumerate(lines):
+            if ln.startswith("@@") or ln.startswith("+++ "):
+                body_start = i
+                break
+        out = []
+        for ln in lines[body_start:]:
+            if ln.startswith("@@"):
+                out.append(f'<span class="hunk">{esc(ln)}</span>')
+            elif ln.startswith("+++") or ln.startswith("---"):
+                out.append(f'<span class="filehdr">{esc(ln)}</span>')
+            elif ln.startswith("+"):
+                out.append(f'<span class="add">{esc(ln)}</span>')
+            elif ln.startswith("-"):
+                out.append(f'<span class="del-line">{esc(ln)}</span>')
+            else:
+                out.append(esc(ln))
+        return "\n".join(out)
+
     rows = []
     for bucket, title in [("broken", "Broken"), ("review", "Review needed"), ("safe", "Safe")]:
         in_bucket = [m for m in mods if m.status == bucket]
@@ -246,8 +282,15 @@ def render_html(mods: list[ModImpact], from_ref: str, to_ref: str) -> str:
                     )
                     rows.append(
                         f'<li class="{cls}"><code>res://{esc(cf.path)}</code> '
-                        f'<span class="tag">[{cf.status}] {tag}</span></li>'
+                        f'<span class="tag">[{cf.status}] {tag}</span>'
                     )
+                    if cf.diff_text:
+                        line_count = cf.diff_text.count("\n")
+                        rows.append(
+                            f'<details class="diff"><summary>view diff ({line_count} lines)</summary>'
+                            f'<pre>{render_diff(cf.diff_text)}</pre></details>'
+                        )
+                    rows.append("</li>")
                 rows.append("</ul>")
             rows.append("</div>")
 
@@ -268,6 +311,17 @@ def render_html(mods: list[ModImpact], from_ref: str, to_ref: str) -> str:
     li.body { color: #666; }
     code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 12px; }
     .tag { color: #888; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    details.diff { margin: 0.4rem 0 0.6rem 0; }
+    details.diff summary { cursor: pointer; color: #2563eb; font-size: 12px; user-select: none; }
+    details.diff pre {
+      background: #0f172a; color: #e2e8f0; padding: 0.75rem 1rem; border-radius: 4px;
+      font: 12px/1.45 ui-monospace, "Cascadia Code", Menlo, Consolas, monospace;
+      overflow-x: auto; margin: 0.4rem 0 0 0; white-space: pre;
+    }
+    .add { color: #4ade80; }
+    .del-line { color: #f87171; }
+    .hunk { color: #60a5fa; }
+    .filehdr { color: #94a3b8; }
     """
     return f"""<!doctype html>
 <html><head><meta charset="utf-8"><title>Mod impact report</title><style>{style}</style></head>
@@ -286,6 +340,10 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--to", dest="to_ref", default="HEAD", help="to-ref (default: HEAD)")
     p.add_argument("--list-tags", action="store_true", help="list known snapshot tags and exit")
     p.add_argument("--output", type=Path, help="also write HTML report to this path")
+    p.add_argument(
+        "--no-diffs", action="store_true",
+        help="omit line-level diffs from the HTML (lighter file, no decompiled source embedded)",
+    )
     return p.parse_args()
 
 
@@ -329,7 +387,10 @@ def main() -> int:
         print(f"(no changes — {args.from_ref} and {args.to_ref} point to the same commit)")
         return 0
 
-    mods = analyze(args.from_ref, args.to_ref, paths["history"], paths["mods"])
+    mods = analyze(
+        args.from_ref, args.to_ref, paths["history"], paths["mods"],
+        include_diffs=not args.no_diffs,
+    )
     print(render_text(mods, args.from_ref, args.to_ref))
 
     if args.output:
