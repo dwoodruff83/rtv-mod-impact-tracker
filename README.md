@@ -6,15 +6,14 @@ Built primarily for [Road to Vostok](https://store.steampowered.com/app/1963610/
 
 ## What it does
 
-When the game gets a patch and you re-decompile it, the tool:
+The tool ships three scripts:
 
-1. Snapshots the new decompiled scripts into a git history repo, tagged with the game version + Steam build id.
-2. Walks your `mods/` folder, parses each mod's `take_over_path()` calls (string-literal *and* `const`-referenced paths) and `mod.txt` autoloads.
-3. Diffs the overridden files between the previous snapshot and the new one.
-4. Classifies each mod:
-   - 🟢 **safe** — overridden files weren't touched
-   - 🟡 **review** — overridden file body changed but function signatures held; the override probably still works but is worth reading
-   - 🔴 **broken** — overridden file was deleted, or its function signatures, `extends`, or `class_name` lines changed; the override almost certainly needs updating
+- **`snapshot.py`** — captures the current decompiled scripts into a git history repo, tagged with the game version + Steam build id.
+- **`analyze_mods.py`** — walks your `mods/` folder, parses each mod's `take_over_path()` calls (string-literal *and* `const`-referenced paths) and `mod.txt` autoloads, then diffs the overridden files between two snapshots and classifies each mod:
+  - 🟢 **safe** — overridden files weren't touched
+  - 🟡 **review** — overridden file body changed but function signatures held; the override probably still works but is worth reading
+  - 🔴 **broken** — overridden file was deleted, or its function signatures, `extends`, or `class_name` lines changed; the override almost certainly needs updating
+- **`changelog.py`** — walks consecutive snapshot tags and emits a Markdown changelog showing what changed in the *game itself* between versions: added/deleted/renamed files, and per-modified-`.gd`-file breakdowns of added functions, removed functions, and signature changes. Renders cleanly on GitHub and pastes into release notes.
 
 The git repo *is* the diff engine, so you can also browse changes directly with `git log`, `git diff`, or VS Code's git UI.
 
@@ -94,6 +93,23 @@ python /path/to/rtv-mod-impact-tracker/analyze_mods.py \
 
 If you don't pass `--from`, the tool uses the second-most-recent tag and compares it to the most-recent. Pass `--list-tags` to see what's available.
 
+### Generate a changelog
+
+```bash
+# Full changelog covering every version transition
+python /path/to/rtv-mod-impact-tracker/changelog.py --output CHANGELOG.md
+
+# Just one transition
+python /path/to/rtv-mod-impact-tracker/changelog.py \
+  --from game-v0.1.0.0-build22674175 \
+  --to game-v0.1.1.3-build22913400
+
+# Everything since a given snapshot
+python /path/to/rtv-mod-impact-tracker/changelog.py --since game-v0.1.0.0-build22674175
+```
+
+Output is Markdown with sections per version transition: file counts, lists of added/deleted scripts, and per-modified-`.gd`-file breakdowns of function-level changes.
+
 ### Useful flags
 
 ```bash
@@ -117,6 +133,12 @@ If you don't want to type the full path every time, drop a one-line `.bat` (Wind
 ```bat
 :: snapshot.bat
 @python F:\rtv-mod-impact-tracker\snapshot.py %*
+
+:: analyze_mods.bat
+@python F:\rtv-mod-impact-tracker\analyze_mods.py %*
+
+:: changelog.bat
+@python F:\rtv-mod-impact-tracker\changelog.py %*
 ```
 
 ```bash
