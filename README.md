@@ -48,18 +48,33 @@ No `pip install`. No third-party Python packages. Standard library only.
 
 ---
 
+## Two workflows
+
+There are two ways to populate your snapshot history:
+
+- **Simple (manual):** decompile the game with GDRE after each patch, then run `snapshot.py`. This is what most modders will use day-to-day. **You only need Python, Git, and GDRE Tools.**
+- **Advanced (automated backfill):** use `fetch_version.py` to pull *any* historical Steam build, decompile it, and snapshot it in one shot. Useful if you want to backfill old game versions you missed. Requires DepotDownloader (auto-installed) and a Steam account that owns the game.
+
+The Quickstart below covers the simple path. Skip to the [`fetch_version.py`](#fetch_versionpy) reference if you want the automated flow.
+
+---
+
 ## Quickstart
 
 A typical first run takes about five minutes after you have the prerequisites.
 
-### 1. Decompile the game
+### 1. Install and run GDRE Tools (decompile the game)
 
-Use [GDRE Tools](https://github.com/bruvzg/gdsdecomp). Either GUI (point it at `RTV.pck`, click "Recover Project") or CLI:
+GDRE Tools is a separate project that converts Godot `.pck` files back to readable GDScript. You'll run it once per game patch.
+
+1. Download the latest release from https://github.com/bruvzg/gdsdecomp/releases (Windows users grab the zip).
+2. Extract somewhere stable, e.g. `C:\modding-tools\GDRE_tools\`.
+3. Run it on the game's PCK. Either via GUI (launch `gdre_tools.exe`, point it at `RTV.pck`, click "Recover Project") or via CLI:
 
 ```bash
-gdre_tools.exe --headless \
-  --recover="C:\Program Files (x86)\Steam\steamapps\common\Road to Vostok\RTV.pck" \
-  --output="C:\my-rtv-modding\reference\RTV_decompiled" \
+C:\modding-tools\GDRE_tools\gdre_tools.exe --headless ^
+  --recover="C:\Program Files (x86)\Steam\steamapps\common\Road to Vostok\RTV.pck" ^
+  --output="C:\my-rtv-modding\reference\RTV_decompiled" ^
   --scripts-only
 ```
 
@@ -133,18 +148,28 @@ That's it — you have a baseline.
 
 ### 5. After the next game patch
 
-Re-run GDRE to refresh `reference/RTV_decompiled`, then:
+Each time the game updates, run these four steps in order:
 
-```bash
-python C:\rtv-mod-impact-tracker\snapshot.py
-python C:\rtv-mod-impact-tracker\analyze_mods.py --output report.html
-python C:\rtv-mod-impact-tracker\changelog.py --output CHANGELOG.md
-```
+1. **Re-decompile** — point GDRE at the new `RTV.pck` and overwrite `reference/RTV_decompiled` (same command as Quickstart §1).
+2. **Snapshot** the new state:
+   ```bash
+   python C:\rtv-mod-impact-tracker\snapshot.py
+   ```
+3. **Analyze** which of your mods are affected:
+   ```bash
+   python C:\rtv-mod-impact-tracker\analyze_mods.py --output report.html
+   ```
+4. **Generate a changelog** of game-side changes (optional but useful):
+   ```bash
+   python C:\rtv-mod-impact-tracker\changelog.py --output CHANGELOG.md
+   ```
 
 You now have:
 - A new tagged snapshot in `reference/RTV_history/`
 - An HTML report telling you which mods broke
 - A Markdown changelog of every game-side change in this patch
+
+⚠️ **The re-decompile is mandatory.** `snapshot.py` reads from `reference/RTV_decompiled`; if you skip step 1, you'll re-snapshot the previous version under a new tag.
 
 ---
 
@@ -305,6 +330,16 @@ The manifests registry is a JSON file (default `manifests.json` at workspace roo
 ```
 
 Manifest IDs come from [SteamDB](https://steamdb.info/) — copy from your browser. SteamDB blocks automated requests, so registration is manual; everything else is automatic.
+
+#### Steam authentication
+
+`fetch fetch <label>` and `fetch backfill` both call DepotDownloader, which needs to log in to Steam to download paid games:
+
+- **First run**: pass `--username <your-steam-login>`. DepotDownloader will prompt for your password and Steam Guard 2FA code in the terminal.
+- **Subsequent runs**: the session token is cached in DepotDownloader's `.DepotDownloader` subdirectory (Steam keeps these alive for weeks), so re-running with the same `--username` typically skips the password and 2FA prompts.
+- **Anonymous downloads**: not supported for paid games. You must own the game on the Steam account you use.
+
+If you don't pass `--username`, DepotDownloader will fail with an authentication error.
 
 ---
 
