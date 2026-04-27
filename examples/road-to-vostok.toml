@@ -26,3 +26,37 @@ exclude_toplevel = ["mods", ".godot", "gdre_export.log"]
 # gdre_exe             = "tools/GDRE_tools/gdre_tools.exe"
 # depot_downloader_exe = "tools/DepotDownloader/DepotDownloader.exe"
 # scratch_dir          = "tools/_versions"
+
+# ---------------------------------------------------------------------------
+# Mod-dependency tracking. Each [[deps]] entry is a public git repo with
+# tagged releases. `deps_fetch sync` clones missing ones into `path` (and
+# `git fetch --tags` on existing ones); the other deps_* scripts read tags
+# straight from those local clones.
+#
+# Add as many entries as you want -- one per upstream library you depend on.
+# Below are the two canonical RTV deps; copy the shape for your own.
+# ---------------------------------------------------------------------------
+
+[[deps]]
+name           = "metro"
+display_name   = "Metro Mod Loader"
+repo           = "https://github.com/ametrocavich/vostok-mod-loader"
+path           = "reference/MetroModLoader_source"
+modworkshop_id = 55623
+
+[[deps]]
+name           = "mcm"
+display_name   = "Mod Configuration Menu"
+repo           = "https://github.com/DoinkOink/Mod-Configuration-Menu-Road-To-Vostok"
+path           = "reference/MCM_source"
+modworkshop_id = 53713
+
+# Add your own deps below. For example, if you depend on a hypothetical
+# MyItemFramework mod whose source lives at github.com/someone/my-item-fw:
+#
+# [[deps]]
+# name           = "myitemfw"
+# display_name   = "My Item Framework"
+# repo           = "https://github.com/someone/my-item-fw"
+# path           = "reference/MyItemFramework_source"
+# modworkshop_id = 99999    # optional; populates a cross-ref hint

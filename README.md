@@ -1,27 +1,28 @@
 # rtv-mod-impact-tracker
 
-**Track decompiled Godot game scripts across patches and tell which of your mods will break.**
+**Tell which of your Godot-game mods will break before you launch the game — and track the upstream libraries you depend on for breaking changes between releases.**
 
-Built primarily for [Road to Vostok](https://store.steampowered.com/app/1963610/) modding, but the analysis is generic — it works for any Godot game that uses `take_over_path()`-style script overrides and ships via Steam.
+Built primarily for [Road to Vostok](https://store.steampowered.com/app/1963610/) modding, but the analysis is generic. The game-tracking pipeline (`snapshot.py` / `analyze_mods.py` / `changelog.py` / `fetch_version.py`) works for **any Godot game that uses `take_over_path()`-style script overrides and ships via Steam**. The dep-tracking pipeline (`deps_*.py`) works for **any GitHub-hosted upstream with semver tags** — mod loaders, config-menu frameworks, content registries, etc. Add an entry per upstream in `mod_tracker.toml` and the tool handles the rest.
 
 ---
 
-## The problem this solves
+## The problems this solves
 
-You've made a Road to Vostok mod that overrides `res://Scripts/Police.gd` to make boss spawns more reliable. The game gets patched. Now what?
+**Problem 1 — game patches breaking your mods.** You override `res://Scripts/Police.gd` to make boss spawns more reliable. The game gets patched. Did `Police.gd` change? Did the function signatures your override depends on change, or just the bodies? Multiply this by every mod you maintain, every patch.
 
-- Did `Police.gd` change?
-- If yes — did the function signatures your override depends on change, or just the bodies?
-- Did the game add/remove any files that affect your other mods?
-- Multiply this by every mod you maintain, every patch.
+Without tooling, you find out by launching the game and watching it crash. With this tool, you find out from an HTML report in 5 seconds.
 
-Without tooling, you find out by launching the game and watching it crash. With this tool, you find out from a Markdown report in 5 seconds.
+**Problem 2 — upstream library updates breaking your mods.** Your mod depends on a popular mod loader or a config-menu framework. The author cuts a new version. Did any of the API methods your mod calls change signature or get removed? What new APIs are now available that you could simplify your code with?
+
+Without tooling, you find out by reading every release commit by hand or by users reporting bugs. With this tool, you point `deps_audit.py` at the new tag and get a punch list.
 
 ---
 
 ## What you get
 
-Four small Python scripts, each focused on one job:
+Eight small Python scripts split into two families:
+
+**Game tracking** — for the host game you're modding. Steam-sourced; uses a parallel `*_history` git repo because the upstream isn't a git repo.
 
 | Script | What it does |
 |--------|-------------|
@@ -30,7 +31,16 @@ Four small Python scripts, each focused on one job:
 | **`changelog.py`** | Walks consecutive snapshot tags and emits a Markdown changelog of game-side changes — added/deleted/renamed files, function-level breakdowns of every modified script. Pastes cleanly into release notes. |
 | **`fetch_version.py`** | Downloads a specific historical Steam build via DepotDownloader, decompiles it with GDRE_Tools, and snapshots it — all in one shot. Backfill old game versions you missed; reproduce any past patch from a manifest ID. Subcommands: `list`, `add`, `bootstrap`, `fetch`, `backfill`. |
 
-The git repo *is* the diff engine, so you can also browse changes directly with `git log`, `git diff`, or VS Code's git UI on the history folder.
+**Dependency tracking** — for upstream libraries your mods depend on (mod loader, config menu framework, item registry, etc.). GitHub-sourced; uses upstream's own tags directly via local mirror clones, so no parallel history repo.
+
+| Script | What it does |
+|--------|-------------|
+| **`deps_fetch.py`** | Manages local mirror clones of upstream dep repos. `deps_fetch sync` clones missing ones, fetches new tags on existing ones. Other subcommands: `list`, `tags <name>`, `add`. |
+| **`deps_diff.py`** | Diffs one dep between two of its tags. Reports added/removed/modified files and per-file function/signal signature changes. Same HTML rendering as `analyze_mods.py` (color-coded per-file diffs, collapsible). |
+| **`deps_audit.py`** | Cross-references dep changes against your mods' call sites. Walks the dep at both tags to find removed-or-changed function names, scans every `.gd` under `mods/` for matching `.method(` calls, classifies each mod as 🟢 safe / 🟡 review / 🔴 broken. Heuristic (name match, not type-aware). |
+| **`deps_changelog.py`** | Walks consecutive dep tags and emits Markdown release notes — same shape as `changelog.py` but per-dep. |
+
+The git repos *are* the diff engine, so you can also browse changes directly with `git log`, `git diff`, or VS Code's git UI — on either the game-history folder or the dep mirror clones.
 
 ---
 
@@ -171,6 +181,29 @@ You now have:
 
 ⚠️ **The re-decompile is mandatory.** `snapshot.py` reads from `reference/RTV_decompiled`; if you skip step 1, you'll re-snapshot the previous version under a new tag.
 
+### 6. (Optional) Track upstream mod dependencies
+
+If your mod depends on other mods (a mod loader, a config-menu framework, an item registry, etc.) and those mods publish source on GitHub with semver tags, declare them in `mod_tracker.toml` under `[[deps]]`:
+
+```toml
+[[deps]]
+name           = "metro"                                  # short id used on CLI
+display_name   = "Metro Mod Loader"
+repo           = "https://github.com/<owner>/<repo>"
+path           = "reference/MetroModLoader_source"        # workspace-relative clone path
+modworkshop_id = 55623                                    # optional cross-ref
+```
+
+Then:
+
+```bash
+python C:\rtv-mod-impact-tracker\deps_fetch.py sync       # clone everything
+python C:\rtv-mod-impact-tracker\deps_diff.py --dep metro --output metro_diff.html
+python C:\rtv-mod-impact-tracker\deps_audit.py --dep metro --output metro_audit.html
+```
+
+`deps_audit.py` is the headline value: it cross-references every signature change in the dep against your mods' `.method(` call sites and tells you which of your mods are broken vs. safe.
+
 ---
 
 ## Optional: convenience wrappers
@@ -190,6 +223,12 @@ If you don't want to type the full path every time, drop one-line wrapper script
 
 :: fetch_version.bat
 @python C:\rtv-mod-impact-tracker\fetch_version.py %*
+
+:: deps_fetch.bat / deps_diff.bat / deps_audit.bat / deps_changelog.bat
+@python C:\rtv-mod-impact-tracker\deps_fetch.py %*
+@python C:\rtv-mod-impact-tracker\deps_diff.py %*
+@python C:\rtv-mod-impact-tracker\deps_audit.py %*
+@python C:\rtv-mod-impact-tracker\deps_changelog.py %*
 ```
 
 **macOS / Linux (`.sh`):**
@@ -198,7 +237,7 @@ If you don't want to type the full path every time, drop one-line wrapper script
 exec python ~/rtv-mod-impact-tracker/snapshot.py "$@"
 ```
 
-After that, the daily commands become just `snapshot`, `analyze_mods`, `changelog`, `fetch_version`.
+After that, the daily commands become just `snapshot`, `analyze_mods`, `changelog`, `fetch_version`, `deps_fetch`, `deps_diff`, `deps_audit`, `deps_changelog`.
 
 ---
 
@@ -245,13 +284,13 @@ Mod impact: game-v0.1.0.0-build22674175  ->  game-v0.1.1.3-build22913400
 ========================================================================
 
 [REVIEW]
-  🟡 CatAutoFeed  (overrides: 1)
+  🟡 MyDatabaseMod  (overrides: 1)
       - [M] res://Scripts/Database.gd  (body changed)
-  🟡 PunisherGuarantee  (overrides: 1)
+  🟡 MyPoliceTweak  (overrides: 1)
       - [M] res://Scripts/Police.gd  (body changed)
 
 [SAFE]
-  🟢 Wallet  (overrides: 0)
+  🟢 MyUiMod  (overrides: 0)
 ```
 
 ### `changelog.py`
@@ -343,6 +382,98 @@ If you don't pass `--username`, DepotDownloader will fail with an authentication
 
 ---
 
+### `deps_fetch.py`
+
+Manages local mirror clones of upstream dep repos.
+
+```
+python deps_fetch.py <subcommand>
+```
+
+| Subcommand | Effect |
+|-----------|--------|
+| `list` | Show all registered deps and clone status (tag count, latest tag, path) |
+| `sync [name]` | Clone (if missing) or `git fetch --tags --force` (if present). Pass `name` to sync one dep, omit for all |
+| `tags <name>` | List every tag known on a dep clone, sorted by creation date |
+| `add <name> --repo URL --path REL [...]` | Append a new `[[deps]]` entry to `mod_tracker.toml`. Optional: `--display-name`, `--modworkshop-id` |
+
+### `deps_diff.py`
+
+Diffs one dep between two of its tags.
+
+```
+python deps_diff.py --dep NAME [--from REF] [--to REF] [options]
+```
+
+| Option | Effect |
+|--------|--------|
+| `--dep NAME` | Required. Dep id from `mod_tracker.toml`'s `[[deps]]` array (e.g. `mcm`, `metro`) |
+| `--from REF` | From-ref tag. Default: second-most-recent tag |
+| `--to REF` | To-ref tag. Default: most-recent tag |
+| `--list-tags` | List tags on the dep clone and exit |
+| `--output PATH` | Write HTML report to this path |
+| `--no-diffs` | Omit per-file unified diffs from HTML (lighter, no upstream source embedded) |
+
+### `deps_audit.py`
+
+Cross-references dep changes against your mods' call sites. Conservative heuristic: a dep function whose signature changed or was removed flags every `.func_name(` call in your mods that matches by name. False positives are expected — read each hit with that in mind.
+
+```
+python deps_audit.py --dep NAME [--from REF] [--to REF] [options]
+```
+
+| Option | Effect |
+|--------|--------|
+| `--dep NAME` | Required. Dep id from `[[deps]]` |
+| `--from REF` / `--to REF` | Tag pair (defaults: second-most-recent and most-recent) |
+| `--list-tags` | List tags on the dep clone and exit |
+| `--output PATH` | Write HTML report to this path |
+| `--include-added` | Also flag mods that call methods which only exist in `--to` (treat as 🟡 review). Off by default since most matches are name coincidences |
+
+### `deps_changelog.py`
+
+Generates a Markdown changelog for one dep, walking its tags.
+
+```
+python deps_changelog.py --dep NAME [options]
+```
+
+| Option | Effect |
+|--------|--------|
+| `--dep NAME` | Required. Dep id from `[[deps]]` |
+| (no `--from`/`--to`) | Full changelog: every transition between consecutive tags |
+| `--from REF --to REF` | Single-section changelog for one transition |
+| `--since TAG` | Only include transitions after this tag |
+| `--output PATH` | Write to file (also prints to stdout) |
+
+### Dep-tracking workflow
+
+```bash
+# 1. Register the upstreams (or edit mod_tracker.toml directly)
+python deps_fetch.py add metro \
+  --repo https://github.com/<author>/<loader-repo> \
+  --path reference/MetroModLoader_source \
+  --display-name "Metro Mod Loader" --modworkshop-id 55623
+
+# 2. Clone everything
+python deps_fetch.py sync
+
+# 3. See what tags exist
+python deps_fetch.py tags mcm
+
+# 4. After upstream releases a new version: refresh
+python deps_fetch.py sync
+
+# 5. See what changed and what it breaks
+python deps_diff.py --dep mcm --output mcm_diff.html
+python deps_audit.py --dep mcm --output mcm_audit.html
+
+# 6. Generate release-note-style summary
+python deps_changelog.py --dep mcm --since v2.6.0 --output mcm_changelog.md
+```
+
+---
+
 ## Configuration reference
 
 Every field in `mod_tracker.toml`:
@@ -371,6 +502,15 @@ exclude_toplevel = ["mods", ".godot", "gdre_export.log"]
 # gdre_exe             = "tools/GDRE_tools/gdre_tools.exe"
 # depot_downloader_exe = "tools/DepotDownloader/DepotDownloader.exe"
 # scratch_dir          = "tools/_versions"
+
+# Optional. Only needed if you use deps_*.py. Each entry is one upstream
+# dependency repo. Add as many as you have deps to track.
+# [[deps]]
+# name           = "metro"                                       # short id used on CLI
+# display_name   = "Metro Mod Loader"                            # human label
+# repo           = "https://github.com/owner/repo"               # upstream git URL
+# path           = "reference/MetroModLoader_source"             # workspace-relative clone path
+# modworkshop_id = 55623                                         # optional cross-ref
 ```
 
 The tool finds this file by walking up from your current working directory, so you can run commands from any subfolder of the workspace.
@@ -416,8 +556,26 @@ The heuristic is intentionally conservative — it favors false positives (flagg
 
 - **Decompile the game.** Use [GDRE Tools](https://github.com/bruvzg/gdsdecomp). This tool consumes its output.
 - **Ship game scripts.** The history repo is created locally on your machine from your own decompile and stays there. Do not push it to a public repo — decompiled game content is a copyright grey zone.
-- **Generate migration patches.** It tells you *what* changed in the game scripts your override depends on, not *how* to adapt your override. That's still your job.
+- **Mirror upstream dep source into this tool's own repo.** Dep mirror clones live in *your* workspace under `reference/<DepName>_source/`, gitignored. They're regenerable via `deps_fetch sync`.
+- **Generate migration patches.** It tells you *what* changed in the game scripts (or dep APIs) your code depends on, not *how* to adapt. That's still your job.
 - **Detect logic-level breakage.** A function whose signature is unchanged but whose internal logic now violates assumptions your override depends on will be flagged 🟡 review, not 🔴 broken. Read the body diff to be sure.
+- **Disambiguate dep API name collisions.** `deps_audit.py` matches by method name (`.foo(`) — if your mod has a local `foo()` and the dep also has one, both will be flagged. False positives are by design (conservative); read each hit with that in mind.
+
+---
+
+## Legal and ethical use
+
+This tool is community modding tooling, similar in shape to xEdit (Bethesda games), MCP (Minecraft), DayZ Tools (Bohemia), or SMAPI (Stardew Valley). It exists to help mod authors keep their work compatible with game patches and upstream library updates.
+
+**The boundaries this tool operates within:**
+
+- **You must own the game.** Snapshotting requires you to first decompile your own copy of the game. `fetch_version.py` calls Steam (via DepotDownloader) using your own credentials and only works for games on your account.
+- **Decompilation happens via [GDRE Tools](https://github.com/bruvzg/gdsdecomp), a separate project.** This tool consumes the output; it does not perform decompilation itself, ship a decompiler, or work around any DRM.
+- **No game content is bundled or distributed by this repo.** The history repo, the decompile, and the dep mirror clones all live on your local filesystem. They are gitignored by the example workspace `.gitignore` and the README explicitly warns against pushing them to public repositories.
+- **No telemetry, no calls home, no third-party services.** The tool runs locally. The only network access is `git fetch`/`git clone` against the public GitHub upstream URLs you put in `mod_tracker.toml`, plus DepotDownloader against Steam (only if you opt into `fetch_version.py fetch`).
+- **MIT licensed.** Use it, fork it, ship it. No restrictions beyond the standard MIT terms.
+
+**If you're a game developer reading this:** this tool is built to help your modding community ship higher-quality, more compatible mods. It does not redistribute your code or assets. If you'd nonetheless prefer it not exist, [open an issue]() on this repo and the maintainer will work with you on a takedown — modders don't want to fight the people whose games they love.
 
 ---
 
@@ -437,7 +595,7 @@ The heuristic is intentionally conservative — it favors false positives (flagg
 
 ## Contributing
 
-Issues and PRs welcome. The codebase is intentionally small and dependency-free; please keep it that way. Three scripts, no plugins.
+Issues and PRs welcome. The codebase is intentionally small and dependency-free; please keep it that way. Eight scripts (four game-tracking, four dep-tracking), no plugins, no `pip install`.
 
 If you adapt this for a different Godot game, an example config in `examples/` would be appreciated.
 
