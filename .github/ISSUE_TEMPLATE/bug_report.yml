@@ -1,0 +1,129 @@
+name: Bug report
+description: A tool command misbehaves, errors, or produces unexpected output
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for filing this. Please include the **exact command you ran**
+        and the **complete error output** (or expected-vs-actual). Most
+        bug reports stall on missing version info and unredacted command
+        output, so the fields below ask for both up front.
+
+  - type: dropdown
+    id: subcommand
+    attributes:
+      label: Which script / subcommand?
+      description: If multiple are involved, pick the one that errored or produced wrong output.
+      options:
+        - snapshot.py
+        - analyze_mods.py
+        - changelog.py
+        - fetch_version.py
+        - deps_fetch.py
+        - deps_diff.py
+        - deps_audit.py
+        - deps_changelog.py
+        - Multiple / unsure
+        - Other (describe in body)
+    validations:
+      required: true
+
+  - type: input
+    id: tool_version
+    attributes:
+      label: Tool version
+      description: Either the GitHub tag (e.g. `v1.0.0`) or the commit SHA from `git rev-parse HEAD` if you're running an unreleased build.
+      placeholder: e.g. v1.0.0
+    validations:
+      required: true
+
+  - type: input
+    id: python_version
+    attributes:
+      label: Python version
+      description: Output of `python --version`.
+      placeholder: e.g. Python 3.11.9
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows 10
+        - Windows 11
+        - macOS
+        - Linux
+        - Other (describe in body)
+    validations:
+      required: true
+
+  - type: input
+    id: target_game
+    attributes:
+      label: Target game
+      description: The game this tool is being used against. Most users are on Road to Vostok, but the tool is designed to work for any Godot-on-Steam game — knowing helps if the issue is game-specific.
+      placeholder: e.g. Road to Vostok
+    validations:
+      required: false
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command you ran
+      description: Exact command including flags. Wrap in triple backticks for readability.
+      render: shell
+      placeholder: |
+        python analyze_mods.py --from game-v0.1.0.0-build22674175 --to HEAD --output report.html
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What did you expect the command to output / produce?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened? Include the full traceback if Python errored.
+      render: shell
+      placeholder: |
+        Traceback (most recent call last):
+          File "analyze_mods.py", line 42, in <module>
+            ...
+        SomeError: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant mod_tracker.toml content
+      description: Paste the section(s) of your config that this command reads. Redact any private paths if needed.
+      render: toml
+      placeholder: |
+        [paths]
+        decompiled = "..."
+        history    = "..."
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmations
+      options:
+        - label: I searched existing issues
+          required: true
+        - label: I'm running Python 3.11+
+          required: true
+        - label: My git is recent (`git --version` → 2.20+)
+          required: false

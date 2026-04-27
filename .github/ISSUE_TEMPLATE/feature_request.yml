@@ -1,0 +1,59 @@
+name: Feature request
+description: Suggest a new command, flag, output format, or behavior change
+title: "[Feature] "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Lead with the *problem* — what diagnostic or workflow gap are you hitting
+        with the current tool? Concrete use cases get prioritized over abstract
+        "would be nice if" ideas. The tool is intentionally small (eight scripts,
+        stdlib only); proposals that fit that shape land faster.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / use case
+      description: What workflow are you trying to accomplish? What's frustrating about the current behavior?
+      placeholder: |
+        I'm tracking five upstream deps in deps_fetch and have to run deps_diff
+        eight separate times to scan everything. Would be nice to scan them all
+        in one go and get a combined report.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: What command / flag / output shape would solve it?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds you tried, or other shapes the feature could take.
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      description: The tool is deliberately small. Please confirm the proposal fits.
+      options:
+        - label: This can be implemented using only Python's standard library (no `pip install`)
+          required: true
+        - label: This doesn't require persistent state outside the existing git repos and config files
+          required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Other confirmations
+      options:
+        - label: I searched existing issues for similar requests
+          required: true
