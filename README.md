@@ -1,5 +1,7 @@
 # rtv-mod-impact-tracker
 
+[![ModWorkshop](https://img.shields.io/badge/ModWorkshop-56405-orange)](https://modworkshop.net/mod/56405)
+
 **Tell which of your Godot-game mods will break before you launch the game — and track the upstream libraries you depend on for breaking changes between releases.**
 
 Built primarily for [Road to Vostok](https://store.steampowered.com/app/1963610/) modding, but the analysis is generic. The game-tracking pipeline (`snapshot.py` / `analyze_mods.py` / `changelog.py` / `fetch_version.py`) works for **any Godot game that uses `take_over_path()`-style script overrides and ships via Steam**. The dep-tracking pipeline (`deps_*.py`) works for **any GitHub-hosted upstream with semver tags** — mod loaders, config-menu frameworks, content registries, etc. Add an entry per upstream in `mod_tracker.toml` and the tool handles the rest.
