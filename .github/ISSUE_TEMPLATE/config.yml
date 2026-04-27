@@ -1,0 +1,12 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: ModWorkshop page
+    url: https://modworkshop.net/mod/56405
+    about: For Road to Vostok modders specifically — quick links to the tool.
+  - name: README and command reference
+    url: https://github.com/dwoodruff83/rtv-mod-impact-tracker#readme
+    about: Quickstart, full command reference, and configuration schema.
+  - name: Road to Vostok Discord
+    url: https://discord.com/invite/roadtovostok
+    about: General modding chat for the primary user audience.

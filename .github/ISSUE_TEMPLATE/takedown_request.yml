@@ -1,0 +1,68 @@
+name: Takedown request (game developer)
+description: For game developers — request changes or removal of this tool
+title: "[Takedown] "
+labels: [takedown]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This template is for **developers of games this tool is used against**.
+        The README's "Legal and ethical use" section commits to working with
+        you on whatever you'd prefer — adjustments, removal, or anything in
+        between. Filing here is the right starting point.
+
+        Modders who use this tool don't want to fight the people whose games
+        they love.
+
+  - type: input
+    id: game
+    attributes:
+      label: Your game
+      description: Name + Steam URL.
+      placeholder: e.g. Road to Vostok — https://store.steampowered.com/app/1963610/
+    validations:
+      required: true
+
+  - type: input
+    id: role
+    attributes:
+      label: Your role
+      description: Developer, publisher, legal counsel, etc.
+      placeholder: e.g. Solo developer
+    validations:
+      required: true
+
+  - type: textarea
+    id: concern
+    attributes:
+      label: Concern
+      description: |
+        What about this tool's existence or behavior would you like changed?
+        Specific examples help — e.g. "the README's screenshots show
+        function-level diffs of decompiled vanilla code" or "I'd prefer the
+        tool not bundle a sample mod_tracker.toml that names my game by id."
+    validations:
+      required: true
+
+  - type: textarea
+    id: preferred_outcome
+    attributes:
+      label: Preferred outcome
+      description: |
+        Choose the level that matches your wishes — or describe something
+        bespoke. The maintainer will work with you on whichever lands.
+      placeholder: |
+        - Adjustment (e.g. specific text removed, screenshot redacted, dep entry removed)
+        - Repo unlisted (private, but accessible via direct link to existing users)
+        - Repo archived (read-only, no future development, GitHub Releases removed)
+        - Repo deleted (full removal, including ModWorkshop entry)
+    validations:
+      required: true
+
+  - type: input
+    id: contact
+    attributes:
+      label: Contact (optional)
+      description: If you'd prefer to continue the discussion off-issue (email, Discord, etc.), provide a contact handle. The maintainer's GitHub username is @dwoodruff83 if you'd rather DM there.
+    validations:
+      required: false
