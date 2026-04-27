@@ -65,7 +65,7 @@ Use the following block. It's tuned for the ModWorkshop audience — assumes the
 >
 > ## Source, issues, contributions
 >
-> [GitHub repo](<insert-public-repo-url-here>). README has the full quickstart, command reference, and configuration schema.
+> [GitHub repo](https://github.com/dwoodruff83/rtv-mod-impact-tracker). README has the full quickstart, command reference, and configuration schema.
 >
 > Built primarily for [Road to Vostok](https://store.steampowered.com/app/1963610/) but the analysis is generic — `snapshot/analyze_mods/changelog/fetch_version` work for any Godot-on-Steam game, and the `deps_*` scripts work for any GitHub-hosted upstream with semver tags.
 
@@ -86,7 +86,7 @@ Place under `screenshots/` in this repo (already gitignored from `.vmz` packagin
 ## Pre-publish checklist
 
 - [ ] Push the repo to a public GitHub URL
-- [ ] Update the `<insert-public-repo-url-here>` placeholder in the description above
+- [ ] Update the `https://github.com/dwoodruff83/rtv-mod-impact-tracker` placeholder in the description above
 - [ ] Capture the screenshots listed above
 - [ ] Verify `examples/road-to-vostok.toml` has the `[[deps]]` section (done as of 2026-04-26)
 - [ ] Confirm CLAUDE.md no longer mentions personal workspace paths (done)
